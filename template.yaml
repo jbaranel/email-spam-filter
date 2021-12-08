@@ -1,0 +1,10 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Amazon SES ConfigurationSet Sample Template
+Parameters:
+  ConfigSetName:
+    Type: String
+Resources:
+  ConfigSet:
+    Type: 'AWS::SES::ConfigurationSet'
+    Properties:
+      Name: !Ref ConfigSetName
