@@ -48,14 +48,67 @@ def email_parse(bucket, key):
 
 
 def return_results(classification, confidence_score):
-    email_response_body = f"""
-    We received your email sent at [EMAIL_RECEIVE_DATE] with the subject [EMAIL_SUBJECT].\n
-    Here is a 240 character sample of the email body: [EMAIL_BODY]\n
-    The email was categorized as {classification} with a {confidence_score}% confidence."""
-    print(email_response_body)
+    ses_client = boto3.client('ses')
+    
+    r1 = f"We received your email sent at [EMAIL_RECEIVE_DATE] with the subject [EMAIL_SUBJECT]."
+    r2 = f"Here is a 240 character sample of the email body: [EMAIL_BODY]\r\n"
+    r3 = f"The email was categorized as {classification} with a {confidence_score}% confidence."
+
+    SUBJECT = "Spam filter results"
+
+    # The email body for recipients with non-HTML email clients.
+    BODY_TEXT = f"""        
+        {r1}\n
+        {r2}\n
+        {r3}\n
+        """
+    # The HTML body of the email.
+    BODY_HTML = f"""
+        <html>
+        <head></head>
+        <body>
+            <h1>Spam Results</h1>
+            <p>{r1}</p>
+            <p>{r2}</p>
+            <p>{r3}</p>
+        </body>
+        </html>
+        """
+
+    CHARSET = "UTF-8"
+
+    receiver_email = 'jimmyb111@optonline.net'
+    response = ses_client.send_email(
+        Source = 'no-reply@spam-filter-jb7607.com',
+        Destination = {
+            'ToAddresses': [
+                receiver_email
+            ]
+        },
+        Message = {
+            'Body': {
+                'Html': {
+                    'Charset': CHARSET,
+                    'Data': BODY_HTML,
+                },
+                'Text': {
+                    'Charset': CHARSET,
+                    'Data': BODY_TEXT,
+                },
+            },
+            'Subject': {
+                'Charset': CHARSET,
+                'Data': SUBJECT,
+            },
+        }
+    )
+    print(response)
     
 
 def lambda_handler(event, context):
+    #s3_event = event['Records']['s3']
+    #bucket = s3_event['bucket']['name']
+    #key = s3_event['object']['key']
     bucket = 'email-received-bucket'
     key = '30gma38vv32jg36culehfo9orct7mrqnv2uiu481'
     email_body = email_parse(bucket, key)
