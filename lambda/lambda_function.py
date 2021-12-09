@@ -1,17 +1,26 @@
-from sagemaker.mxnet.model import MXNetPredictor
 from utilities import one_hot_encode, vectorize_sequences
 import boto3
 import email
+import re
+import json
 
 def make_prediction(message):
     vocabulary_length = 9013
-    mxnet_pred = MXNetPredictor('sms-spam-classifier-mxnet-2021-12-08-05-09-31-356')
+    runtime = boto3.client('runtime.sagemaker')
+    
+    endpoint = 'sms-spam-classifier-mxnet-2021-12-08-05-09-31-356'
 
     test_messages = [message]
     one_hot_test_messages = one_hot_encode(test_messages, vocabulary_length)
     encoded_test_messages = vectorize_sequences(one_hot_test_messages, vocabulary_length)
 
-    result = mxnet_pred.predict(encoded_test_messages)
+    response = runtime.invoke_endpoint(
+        EndpointName=endpoint,
+        ContentType='application/json',
+        Body=json.dumps(encoded_test_messages.tolist()))
+
+    result = json.loads(response['Body'].read().decode())
+
     confidence_score = round(result['predicted_probability'][0][0] * 100, 2)
     label = result['predicted_label'][0][0]
     if label == 1.0:
@@ -28,8 +37,9 @@ def email_parse(bucket, key):
     b = email.message_from_bytes(email_body)
 
     date_received = b["date"]
-    subject = b["subject"]
-
+    subject = b["subject"]    
+    sender = re.findall(r"\<(.*?)\>", b["from"])[0]
+    
     body = b.get_payload(decode=True)   
     body = body.decode()
     email_body = body.replace('\n', ' ').replace('\r', '').strip(' ')[0:240]
@@ -38,6 +48,7 @@ def email_parse(bucket, key):
         'date_received': date_received,
         'subject': subject,
         'body': email_body,
+        'sender': sender
     }
     return results
 
@@ -72,7 +83,7 @@ def return_results(classification, confidence_score, email):
 
     CHARSET = "UTF-8"
 
-    receiver_email = 'jimmyb111@optonline.net'
+    receiver_email = email['sender']
     response = ses_client.send_email(
         Source = 'no-reply@spam-filter-jb7607.com',
         Destination = {
@@ -101,10 +112,9 @@ def return_results(classification, confidence_score, email):
     
 
 def lambda_handler(event, context):
-    s3_event = event['Records']['s3']
+    s3_event = event['Records'][0]['s3']
     bucket = s3_event['bucket']['name']
-    key = s3_event['object']['key']
-    
+    key = s3_event['object']['key']    
     email_results = email_parse(bucket, key)
     classification, confidence_score = make_prediction(email_results['body'])
     return_results(classification, confidence_score, email_results)
