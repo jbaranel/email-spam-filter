@@ -3,19 +3,20 @@ import boto3
 import email
 import re
 import json
+import os
+
 
 def make_prediction(message):
     vocabulary_length = 9013
     runtime = boto3.client('runtime.sagemaker')
+    ENDPOINT = os.environ['SAGEMAKER_ENDPOINT']
     
-    endpoint = 'sms-spam-classifier-mxnet-2021-12-08-05-09-31-356'
-
     test_messages = [message]
     one_hot_test_messages = one_hot_encode(test_messages, vocabulary_length)
     encoded_test_messages = vectorize_sequences(one_hot_test_messages, vocabulary_length)
 
     response = runtime.invoke_endpoint(
-        EndpointName=endpoint,
+        EndpointName=ENDPOINT,
         ContentType='application/json',
         Body=json.dumps(encoded_test_messages.tolist()))
 

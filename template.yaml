@@ -1,10 +1,75 @@
-AWSTemplateFormatVersion: 2010-09-09
-Description: Amazon SES ConfigurationSet Sample Template
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Email Spam Filter
+
 Parameters:
-  ConfigSetName:
+  
+  LambdaName:
     Type: String
-Resources:
-  ConfigSet:
-    Type: 'AWS::SES::ConfigurationSet'
+    Default: HW3
+
+  LambdaBucket:
+    Type: String
+    Default: email-spam-code
+
+  EmailBucket:
+    Type: String
+    Default: email-received-bucketv2
+
+  LambdaKey:
+    Type: String
+    Default: deployment.zip
+
+  PredictionEndpoint:
+    Type: String
+    Default: sms-spam-classifier-mxnet-2021-12-08-05-09-31-356
+
+Resources:  
+  
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
     Properties:
-      Name: !Ref ConfigSetName
+      FunctionName: !Ref Lambda
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Sub 'arn:aws:s3:::{EmailBucket}'
+      
+  LambdaRole: 
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+              Action:
+                - 'sts:AssumeRole'
+      Description: "lambda-role"
+      ManagedPolicyArns: 
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
+        - arn:aws:iam::aws:policy/AmazonSESFullAccess
+
+      Path: "/"
+
+  Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Ref LambdaBucket
+        S3Key: !Ref LambdaKey
+      Runtime: python3.8
+      Role: !GetAtt LambdaRole.Arn
+      Handler: lambda_function.lambda_handler
+      Environment:
+        Variables:
+          SAGEMAKER_ENDPOINT: !Ref PredictionEndpoint
+      FunctionName: !Ref LambdaName
+      Layers:
+        - >- 
+          arn:aws:lambda:us-east-1:770693421928:layer:Klayers-python38-numpy:22
+  
+  
