@@ -24,6 +24,35 @@ Parameters:
     Default: sms-spam-classifier-mxnet-2021-12-08-05-09-31-356
 
 Resources:  
+
+  S3EmailBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties: 
+      BucketName: !Ref EmailBucket
+      VersioningConfiguration: 
+        Status: Enabled
+      PublicAccessBlockConfiguration: 
+        BlockPublicAcls: FALSE
+        BlockPublicPolicy: FALSE
+        IgnorePublicAcls: FALSE
+        RestrictPublicBuckets: FALSE
+  S3EmailBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref EmailBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Sid: AllowSESPuts
+            Effect: Allow
+            Principal:
+              Service: ses.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub arn:aws:s3:::${EmailBucket}/*
+            Condition:
+              StringEquals:
+                aws:Referer: !Ref 'AWS::AccountId'
   
   LambdaPermission:
     Type: AWS::Lambda::Permission
